@@ -2,7 +2,16 @@
 1. Clone the repo `git clone https://github.com/MayankChandratre1/pdfAnalyzer.git`
 2. `cd pdfAnalyzer`
 3. `npm install`
-4. `node index.js`
+4. Setup .env file as 
+   ```
+   AZURE_OPENAI_KEY=
+   AZURE_OPENAI_ENDPOINT=
+   AZURE_OPENAI_REGION=
+   OPENAI_API_VERSION=
+   AZURE_OPENAI_DEPLOYMENT_NAME=
+   ```
+
+5. `node index.js`
 
 ## How to test on Postman
 First, make sure your Express server is running and the endpoint is accessible.
