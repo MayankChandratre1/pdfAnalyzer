@@ -15,15 +15,15 @@ Enter your endpoint URL (e.g., http://localhost:3002/api/analyze)
 
 3. Set up the request body:
 
-In Postman, go to the "Body" tab
-Select "form-data" (this is important for file uploads)
+    In Postman, go to the "Body" tab
+    Select "form-data" (this is important for file uploads)
 
-Add two key-value pairs:
-- Key: pdf (Type: File)
-  Click on the dropdown next to the key and select "File"
-  Value: Select your PDF file
+    Add two key-value pairs:
+   - Key: pdf (Type: File)
+     Click on the dropdown next to the key and select "File"
+     Value: Select your PDF file
 
-- Key: question (Type: Text)
-  Value: "Please analyze this document and provide key insights"
+   - Key: question (Type: Text)
+     Value: "Please analyze this document and provide key insights"
 
 4. Hit Send
