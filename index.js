@@ -5,6 +5,6 @@ const app = express();
 app.use('/api', pdfAnalyzerRouter);
 
 app.listen(3002, ()=>{
-    console.log("Listening 3000");
+    console.log("Listening 3002");
     
 })
