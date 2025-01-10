@@ -3,10 +3,49 @@ import multer from 'multer';
 import { AssistantsClient, AzureKeyCredential } from "@azure/openai-assistants";
 import dotenv from 'dotenv';
 import fs from 'fs';
+import {PDFExtract} from 'pdf.js-extract';
 
 dotenv.config();
 
 const router = express.Router();
+
+const extractPdfText = async (buffer) => {
+  const pdfExtract = new PDFExtract();
+  const options = {}; // Add any specific options if needed
+  const chunks = [];
+  const maxChunkSize = 2000;
+
+  return new Promise((resolve, reject) => {
+    pdfExtract.extractBuffer(buffer, options, (err, data) => {
+      if (err) {
+        console.error(err, "Error PDF Extractor");
+        return reject(err);
+      }
+
+      const pages = data.pages;
+      pages.forEach((page) => {
+        let ch = "";
+        page.content.forEach((chunk) => {
+          console.log("\n=>", chunk.str);
+          if ((ch + chunk.str).length > maxChunkSize) {
+            chunks.push(ch);
+            ch = chunk.str;
+          } else {
+            ch += chunk.str;
+          }
+        });
+
+        // Push the last chunk if there's remaining content
+        if (ch.length > 0) {
+          chunks.push(ch);
+        }
+      });
+
+      resolve(chunks);
+    });
+  });
+};
+
 
 // Configure multer for PDF file uploads
 const storage = multer.diskStorage({
@@ -44,20 +83,18 @@ async function processWithAssistant(pdfPath, question) {
     });
 
     // Upload the PDF file
-    const pdfContent = fs.readFileSync(pdfPath, { encoding: 'utf8', flag: 'r' });
-    const uploadedFile = await assistantsClient.uploadFile(
-      pdfContent,
-      "assistants",
-      { filename: pdfPath.split('/').pop() }
-    );
-
-    // Update assistant with the file
-    await assistantsClient.updateAssistant(assistant.id, {
-      fileIds: [uploadedFile.id]
-    });
+    const pdfContent = fs.readFileSync(pdfPath);
+    const textChunks = await extractPdfText(pdfContent)
+    const thread = await assistantsClient.createThread();
+    for (const chunk of textChunks) {
+      await assistantsClient.createMessage(
+        thread.id,
+        "user",
+        "Here's a part of the PDF content: " + chunk
+      );
+    }
 
     // Create a thread
-    const thread = await assistantsClient.createThread();
 
     // Add message to thread
     await assistantsClient.createMessage(
@@ -73,7 +110,9 @@ async function processWithAssistant(pdfPath, question) {
 
     // Poll for completion
     while (run.status === "queued" || run.status === "in_progress") {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      let timeout = 10000
+      await new Promise(resolve => setTimeout(resolve, timeout));
+      if(timeout > 2000) timeout -= 2000
       run = await assistantsClient.getRun(thread.id, run.id);
        console.log(run, "Run Waiting");
     }
@@ -138,10 +177,17 @@ router.post('/analyze', upload.single('pdf'), async (req, res) => {
         content: message.content.map(c => c.type === 'text' ? c.text.value : null).filter(Boolean)
       };
     });
+    const assistanceResponse = analysis.map(message => {
+      if(message.role == 'assistant')
+        return message.content
+      else
+        return ""
+    })
 
+    const reducedResponse = assistanceResponse.reduce((res, message) => res+message+" ","").trim()
     res.json({
       success: true,
-      analysis
+      analysis: reducedResponse
     });
 
   } catch (error) {
@@ -152,5 +198,23 @@ router.post('/analyze', upload.single('pdf'), async (req, res) => {
     });
   }
 });
+
+
+router.get("/testpdf", upload.single('pdf'), async (req, res) => {
+  try{
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+    const pdfContent = fs.readFileSync(req.file.path);
+    console.log(pdfContent);
+    const chunks = await extractPdfText(pdfContent)
+    fs.unlinkSync(req.file.path);
+    res.send(chunks)
+  }catch(Err){
+    console.log(Err);
+    res.send("err")
+    
+  }
+})
 
 export default router;
